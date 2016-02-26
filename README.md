@@ -17,6 +17,7 @@ While AWS has some features in place to try to do this, they didn't seem to work
         * `"ec2:Describe*"`
         * `route53:ChangeResourceRecordSets` for the zone ID(s) you plan on using
         * `route53:ListHostedZonesByName` for "*"
+        * (you can reference the route53-policy.json for the minimum required Route 53 statements)
 
 ## Assumptions
 
