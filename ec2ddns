@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+function usage() {
+    cat <<EOM
+### ec2ddns ###
+Keeps a Route 53 record pointed at this host based on the "Name" tag. Requires a "domain" component.
+
+Required arguments:
+    -d | --domain     The domain component to use. Must match a Route 53 hosted zone.
+
+Optional arguments:
+    -n | --name       Override the name being reported for this host.
+
+Examples:
+    Associate SERVERNAME.yourcompany.com to this instance's private IP address.
+        ec2ddns -d yourcompany.com
+
+    Force the instance name to "foo" so foo.yourcompany.com will be registered.
+        ec2ddns -d yourcompany.com -n foo
+
+EOM
+  exit 2
+}
+if [ $# == 0 ]; then usage; fi
+
+# ref: http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
+while [[ $# > 1 ]]
+do
+key="$1"
+
+case $key in
+    -n|--name)
+    INSTANCENAME="$2"
+    shift # past argument
+    ;;
+    -d|--domain)
+    DOMAIN="$2"
+    shift # past argument
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift # past argument or value
+done
+
+if [ -z "$DOMAIN" ]; then
+  echo "ERROR: domain parameter (-d) is required"
+  exit 255
+fi
+
+if [ -z "$INSTANCENAME" ]; then
+  INSTANCE=`curl -s http://169.254.169.254/latest/meta-data/instance-id | grep ^i-`
+  if [ "${INSTANCE}no" = "no" ]; then
+    echo "ERROR: couldn't get this instance's ID"
+    exit 255
+  fi
+  INSTANCENAME=`aws ec2 describe-instances --output text --instance-id $INSTANCE | grep "^TAGS[[:space:]]Name" | awk '{ printf $3 }'`
+  if [ "${INSTANCENAME}no" = "no" ]; then
+    echo "ERROR: couldn't get this instance's name"
+    exit 255
+  fi
+fi
+
+# we only want the first match (mainly so this script can function sanely)
+INSTANCEIP=`curl -s http://169.254.169.254/latest/meta-data/local-ipv4 | head -1`
+
+ZONE=`aws route53 list-hosted-zones-by-name --output text --dns-name $DOMAIN | grep ^HOSTEDZONES | grep $DOMAIN | awk '{ printf $3 }' | sed -e 's|/hostedzone/||'`
+if [ "${ZONE}no" = "no" ]; then
+  echo "ERROR: $DOMAIN did not match a Route 53 zone on your AWS account."
+  exit 255
+fi
+
+echo "INFO: Updating $INSTANCENAME.$DOMAIN with $INSTANCEIP"
+
+RESULT=`aws route53 change-resource-record-sets --hosted-zone-id $ZONE --change-batch '{"Changes":[{"Action":"UPSERT","ResourceRecordSet":{"Name":"'"$INSTANCENAME.$DOMAIN"'","Type":"A","TTL":30,"ResourceRecords":[{"Value":"'"$INSTANCEIP"'"}]}}]}' 2>&1`
+
+if [[ "$RESULT" == *"is not authorized to perform"* ]]; then
+  echo "ERROR: instance is not allowed to update Route 53. Is the IAM profile or AWS CLI configured correctly?"
+  exit 255
+fi
+
+# this should be caught above, but just in case.
+if [[ "$RESULT" == *"is not permitted in zone"* ]]; then
+  echo "ERROR: $DOMAIN is not a valid zone in your AWS account."
+  exit 255
+fi
+
+if [[ "$RESULT" == *"SubmittedAt"* ]]; then
+  echo "INFO: Successfully submitted update."
+  exit 0
+fi
+
+echo "ERROR: API returned an unhandled error. Raw text:"
+echo $RESULT
+exit 255
