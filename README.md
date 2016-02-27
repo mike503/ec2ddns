@@ -14,7 +14,7 @@ While AWS has some features in place to try to do this, they didn't seem to work
 
     * your ~/.aws/credentials or ~/.aws/config needs to have valid keys (created by `aws configure`) and EC2/Route 53 privileges, OR
     * the instance in which this runs needs to be in an IAM role that has (at minimum)
-        * `"ec2:Describe*"`
+        * `ec2:DescribeInstances` (still trying to determine how best to limit this)
         * `route53:ChangeResourceRecordSets` for the zone ID(s) you plan on using
         * `route53:ListHostedZonesByName` for "*"
         * (you can reference the route53-policy.json for the minimum required Route 53 statements)
