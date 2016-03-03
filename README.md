@@ -30,3 +30,7 @@ While AWS has some features in place to try to do this, they didn't seem to work
 ## TODO
 
 * Add in a sensible default region (check ~/.aws/config first, then AWS_ environment var, if neither exist, then us-east-1 it)
+
+## Related projects
+
+* https://github.com/ConradIrwin/aws-name-server - a different approach to bridge the same gap
