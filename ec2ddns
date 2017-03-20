@@ -64,7 +64,7 @@ fi
 
 # we only want the first IP match (mainly so this script can function sanely)
 # we used to use the EC2 metadata service, but that won't work inside of a container
-INSTANCEIP=`ip -f inet addr show eth0 | grep -Po 'inet \K[\d.]+' | head -1`
+INSTANCEIP=`ip -f inet addr show | grep -Po 'inet \K[\d.]+' | grep -v 127.0.0.1 | head -1`
 
 ZONE=`aws route53 list-hosted-zones-by-name --output text --dns-name $DOMAIN | grep ^HOSTEDZONES | grep $DOMAIN | awk '{ printf $3 }' | sed -e 's|/hostedzone/||'`
 if [ "${ZONE}no" = "no" ]; then
